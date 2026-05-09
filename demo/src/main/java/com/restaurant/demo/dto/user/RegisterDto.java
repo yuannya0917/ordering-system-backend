@@ -2,6 +2,8 @@ package com.restaurant.demo.dto.user;
 
 import lombok.Data;
 
+
+///注册请求体
 @Data
 public class RegisterDto {
     private String userId;           // 手机号
@@ -15,3 +17,5 @@ public class RegisterDto {
     // Admin 专用
     private String merchantName;
 }
+
+
