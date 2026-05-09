@@ -5,12 +5,10 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 @Data
-@TableName("User")
+@TableName("user")
 public class User {
     @TableId
     private String userId;
-
     private String userPassword;
-
-    private String userType;  // "customer" 或 "admin"
+    // 删除 userType 字段
 }

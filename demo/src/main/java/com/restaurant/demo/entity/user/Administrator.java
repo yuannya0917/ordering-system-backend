@@ -5,12 +5,9 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 @Data
-@TableName("Administrator")
+@TableName("administrator")
 public class Administrator {
     @TableId
     private String userId;
-
-    private String userPassword;
-
     private String merchantName;
 }
