@@ -1,14 +1,11 @@
-// AddMenuDto.java
+// UpdateMenuDto.java
 package com.restaurant.demo.dto.dish;
-
-import java.time.LocalDateTime;
 
 import lombok.Data;
 
 @Data
-public class AddMenuDto {
+public class UpdateMenuDto {
     private String menuId;
     private String menuName;
     private String remark;
-    private LocalDateTime createTime;
 }

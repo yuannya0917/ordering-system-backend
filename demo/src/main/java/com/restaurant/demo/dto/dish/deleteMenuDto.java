@@ -6,4 +6,5 @@ import lombok.Data;
 @Data  // 确保有这个注解
 public class deleteMenuDto {
     private String menuId;
+    
 }

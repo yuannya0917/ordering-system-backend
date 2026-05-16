@@ -5,6 +5,7 @@ import lombok.Data;
 
 @Data
 public class AddDishDto {
+    private String dishId;
     private String dishName;
     private Integer dishPrice;
     private String dishIntroduction;

@@ -3,7 +3,6 @@ package com.restaurant.demo.entity.dish;
 
 import java.time.LocalDateTime;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -15,13 +14,17 @@ import lombok.Data;
 @TableName("menu")
 public class Menu {
     
-    @TableId(type = IdType.ASSIGN_UUID)
+    @TableId(type = IdType.INPUT)
+    @TableField("menuID")
     private String menuId;
     
+    @TableField("menuName")
     private String menuName;
     
+    @TableField("remark")
     private String remark;
     
-    @TableField(fill = FieldFill.INSERT)
+    @TableField("createTime")
     private LocalDateTime createTime;
+    
 }

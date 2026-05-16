@@ -1,12 +1,12 @@
+// AddOrderDetailDto.java
 package com.restaurant.demo.dto.order;
 
 import lombok.Data;
 
 @Data
-public class AddToCartDto {
-    private String userId;
+public class AddOrderDetailDto {
+    private String orderId;
     private String dishId;
-    private String dishName;
-    private Integer dishPrice;
     private Integer dishNum;
+    private Integer dishPrice;
 }

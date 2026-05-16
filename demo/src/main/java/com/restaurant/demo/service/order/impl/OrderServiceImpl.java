@@ -1,11 +1,10 @@
-// OrderServiceImpl.java
 package com.restaurant.demo.service.order.impl;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -28,20 +27,18 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements OrderService {
     
-    // 模拟购物车（实际项目中可用Redis或数据库）
-    private Map<String, CartItemVo> cart = new HashMap<>();
-    
-    // 获取当前登录用户ID（实际从Session或Token获取）
-    private String getCurrentUserId() {
-        // TODO: 从登录上下文获取
-        return "current_user_id";
-    }
+    // 购物车存储结构：userId -> Map<dishId, CartItemVo>
+    private Map<String, Map<String, CartItemVo>> carts = new ConcurrentHashMap<>();
     
     @Override
     public void addToCart(AddToCartDto addToCartDto) {
+        String userId = addToCartDto.getUserId();
         String dishId = addToCartDto.getDishId();
         
-        CartItemVo existingItem = cart.get(dishId);
+        // 获取或创建用户的购物车
+        Map<String, CartItemVo> userCart = carts.computeIfAbsent(userId, k -> new ConcurrentHashMap<>());
+        
+        CartItemVo existingItem = userCart.get(dishId);
         if (existingItem != null) {
             existingItem.setDishNum(existingItem.getDishNum() + addToCartDto.getDishNum());
             existingItem.setTotalPrice(existingItem.getDishPrice() * existingItem.getDishNum());
@@ -52,19 +49,23 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             newItem.setDishPrice(addToCartDto.getDishPrice());
             newItem.setDishNum(addToCartDto.getDishNum());
             newItem.setTotalPrice(addToCartDto.getDishPrice() * addToCartDto.getDishNum());
-            cart.put(dishId, newItem);
+            userCart.put(dishId, newItem);
         }
     }
     
     @Override
-    public void removeFromCart(String dishId) {
-        cart.remove(dishId);
+    public void removeFromCart(String userId, String dishId) {
+        Map<String, CartItemVo> userCart = carts.get(userId);
+        if (userCart != null) {
+            userCart.remove(dishId);
+        }
     }
     
     @Override
-    public CartVo getCart() {
+    public CartVo getCart(String userId) {
         CartVo cartVo = new CartVo();
-        List<CartItemVo> items = new ArrayList<>(cart.values());
+        Map<String, CartItemVo> userCart = carts.getOrDefault(userId, new ConcurrentHashMap<>());
+        List<CartItemVo> items = new ArrayList<>(userCart.values());
         cartVo.setItems(items);
         
         int totalPrice = items.stream()
@@ -76,47 +77,53 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     }
     
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public OrderVo submitOrder(SubmitOrderDto submitOrderDto) {
-        if (cart.isEmpty()) {
-            throw new RuntimeException("购物车为空，无法提交订单");
-        }
-        
-        String userId = getCurrentUserId();
-        
-        // 计算总价
-        int totalPrice = cart.values().stream()
-                .mapToInt(CartItemVo::getTotalPrice)
-                .sum();
-        
-        // 创建订单
-        Order order = new Order();
-        order.setUserId(userId);
-        order.setOrderPrice(totalPrice);
-        order.setOrderNote(submitOrderDto.getOrderNote());
-        order.setOrderTime(LocalDateTime.now());
-        order.setOrderStatus("待确认");
-        
-        this.save(order);
-        
-        // 清空购物车
-        cart.clear();
-        
-        // 返回订单VO
-        OrderVo orderVo = new OrderVo();
-        orderVo.setOrderId(order.getOrderId());
-        orderVo.setOrderPrice(order.getOrderPrice());
-        orderVo.setOrderTime(order.getOrderTime());
-        orderVo.setOrderNote(order.getOrderNote());
-        orderVo.setOrderStatus(order.getOrderStatus());
-        
-        return orderVo;
+@Transactional(rollbackFor = Exception.class)
+public OrderVo submitOrder(SubmitOrderDto submitOrderDto) {
+    String userId = submitOrderDto.getUserId();
+    String orderId = submitOrderDto.getOrderId();  // 获取手动传入的 orderId
+    
+    if (orderId == null || orderId.trim().isEmpty()) {
+        throw new RuntimeException("订单ID不能为空");
     }
     
+    Map<String, CartItemVo> userCart = carts.get(userId);
+    
+    if (userCart == null || userCart.isEmpty()) {
+        throw new RuntimeException("购物车为空，无法提交订单");
+    }
+    
+    // 计算总价
+    int totalPrice = userCart.values().stream()
+            .mapToInt(CartItemVo::getTotalPrice)
+            .sum();
+    
+    // 创建订单
+    Order order = new Order();
+    order.setOrderId(orderId);  // 使用手动传入的 orderId
+    order.setUserId(userId);
+    order.setOrderPrice(totalPrice);
+    order.setOrderNote(submitOrderDto.getOrderNote());
+    order.setOrderTime(LocalDateTime.now());
+    order.setOrderStatus("0");
+    
+    this.save(order);
+    
+    // 清空用户购物车
+    carts.remove(userId);
+    
+    // 返回订单VO
+    OrderVo orderVo = new OrderVo();
+    orderVo.setOrderId(order.getOrderId());
+    orderVo.setOrderPrice(order.getOrderPrice());
+    orderVo.setOrderTime(order.getOrderTime());
+    orderVo.setOrderNote(order.getOrderNote());
+    orderVo.setOrderStatus(order.getOrderStatus());
+    
+    return orderVo;
+}
+    
     @Override
-    public List<OrderVo> getHistoryOrders() {
-        String userId = getCurrentUserId();
-        
+    public List<OrderVo> getHistoryOrders(String userId) {
         LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Order::getUserId, userId)
                .orderByDesc(Order::getOrderTime);
@@ -133,4 +140,14 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             return vo;
         }).collect(Collectors.toList());
     }
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean updateOrderStatus(String orderId, String orderStatus) {
+    Order order = this.getById(orderId);
+    if (order == null) {
+        throw new RuntimeException("订单不存在");
+    }
+    order.setOrderStatus(orderStatus);
+    return this.updateById(order);
+}
 }

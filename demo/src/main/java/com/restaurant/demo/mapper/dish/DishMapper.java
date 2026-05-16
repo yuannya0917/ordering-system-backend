@@ -12,6 +12,6 @@ import com.restaurant.demo.entity.dish.Dish;
 @Mapper
 public interface DishMapper extends BaseMapper<Dish> {
     
-    @Select("SELECT * FROM dish WHERE menu_id = #{menuId} AND deleted = 0")
+    @Select("SELECT * FROM dish WHERE menuID = #{menuId} ")
     List<Dish> selectDishListByMenuId(String menuId);
 }

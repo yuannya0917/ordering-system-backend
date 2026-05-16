@@ -1,4 +1,3 @@
-// OrderService.java
 package com.restaurant.demo.service.order;
 
 import java.util.List;
@@ -14,11 +13,11 @@ public interface OrderService extends IService<Order> {
     
     void addToCart(AddToCartDto addToCartDto);
     
-    void removeFromCart(String dishId);
+    void removeFromCart(String userId, String dishId);
     
-    CartVo getCart();
+    CartVo getCart(String userId);
     
     OrderVo submitOrder(SubmitOrderDto submitOrderDto);
-    
-    List<OrderVo> getHistoryOrders();
+    boolean updateOrderStatus(String orderId, String orderStatus);
+    List<OrderVo> getHistoryOrders(String userId);
 }
