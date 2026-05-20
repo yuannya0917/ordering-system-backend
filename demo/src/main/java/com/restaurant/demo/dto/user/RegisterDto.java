@@ -2,20 +2,12 @@ package com.restaurant.demo.dto.user;
 
 import lombok.Data;
 
-
-///注册请求体
 @Data
 public class RegisterDto {
-    private String userId;           // 手机号
+    private String userId;           // 11位手机号
     private String userPassword;     // 密码
     private String userType;         // "customer" 或 "admin"
-
-    // Customer 专用
-    private String securityQuestion;
-    private String securityAnswer;
-
-    // Admin 专用
-    private String merchantName;
+    private String securityQuestion; // 安全问题（顾客）
+    private String securityAnswer;   // 安全答案（顾客）
+    private String merchantName;     // 商家名称（商家）
 }
-
-

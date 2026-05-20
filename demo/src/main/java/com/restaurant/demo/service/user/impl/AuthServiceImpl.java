@@ -1,22 +1,28 @@
 package com.restaurant.demo.service.user.impl;
 
-import com.restaurant.demo.dto.user.LoginDto;
-import com.restaurant.demo.dto.user.RegisterDto;
-import com.restaurant.demo.dto.user.UpdatePasswordDto;
-import com.restaurant.demo.dto.user.UpdateUserDto;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.restaurant.demo.dto.user.*;
 import com.restaurant.demo.entity.user.Administrator;
 import com.restaurant.demo.entity.user.Customer;
 import com.restaurant.demo.entity.user.User;
+import com.restaurant.demo.entity.order.Order;
 import com.restaurant.demo.mapper.user.AdministratorMapper;
 import com.restaurant.demo.mapper.user.CustomerMapper;
 import com.restaurant.demo.mapper.user.UserMapper;
+import com.restaurant.demo.mapper.user.OrderExtMapper;
 import com.restaurant.demo.service.user.AuthService;
 import com.restaurant.demo.vo.ResultVo;
 import com.restaurant.demo.vo.user.LoginRespVo;
 import com.restaurant.demo.vo.user.UserInfoVo;
+import com.restaurant.demo.vo.user.UserListVo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -30,12 +36,44 @@ public class AuthServiceImpl implements AuthService {
     @Autowired
     private AdministratorMapper administratorMapper;
 
+    @Autowired
+    private OrderExtMapper orderExtMapper;
+
     // ========== 注册 ==========
     @Override
     @Transactional
     public ResultVo<String> register(RegisterDto dto) {
         String userId = dto.getUserId();
         String userType = dto.getUserType();
+        String userPassword = dto.getUserPassword();
+
+        if (userId == null || userId.trim().isEmpty()) {
+            return ResultVo.error("手机号不能为空");
+        }
+        if (!userId.matches("\\d{11}")) {
+            return ResultVo.error("手机号必须为11位数字");
+        }
+        if (userPassword == null || userPassword.trim().isEmpty()) {
+            return ResultVo.error("密码不能为空");
+        }
+        if (userType == null || (!"customer".equals(userType) && !"admin".equals(userType))) {
+            return ResultVo.error("用户类型错误");
+        }
+
+        if ("customer".equals(userType)) {
+            if (dto.getSecurityQuestion() == null || dto.getSecurityQuestion().trim().isEmpty()) {
+                return ResultVo.error("安全问题不能为空");
+            }
+            if (dto.getSecurityAnswer() == null || dto.getSecurityAnswer().trim().isEmpty()) {
+                return ResultVo.error("安全答案不能为空");
+            }
+        }
+
+        if ("admin".equals(userType)) {
+            if (dto.getMerchantName() == null || dto.getMerchantName().trim().isEmpty()) {
+                return ResultVo.error("商家名称不能为空");
+            }
+        }
 
         if (userMapper.selectById(userId) != null) {
             return ResultVo.error("手机号已注册");
@@ -43,12 +81,13 @@ public class AuthServiceImpl implements AuthService {
 
         User user = new User();
         user.setUserId(userId);
-        user.setUserPassword(dto.getUserPassword());
+        user.setUserPassword(userPassword);
         userMapper.insert(user);
 
         if ("customer".equals(userType)) {
             Customer customer = new Customer();
             customer.setUserId(userId);
+            customer.setUsername(userId);
             customer.setSecurityQuestion(dto.getSecurityQuestion());
             customer.setSecurityAnswer(dto.getSecurityAnswer());
             customerMapper.insert(customer);
@@ -97,19 +136,21 @@ public class AuthServiceImpl implements AuthService {
         return ResultVo.error("账号未注册");
     }
 
-    // ========== 修改用户信息（个人资料） ==========
+    // ========== 修改用户信息 ==========
     @Override
     @Transactional
     public ResultVo<String> updateUser(UpdateUserDto dto) {
         String userId = dto.getUserId();
-        
         String userType = getUserType(userId);
         if (userType == null) {
             return ResultVo.error("用户不存在");
         }
-        
+
         if ("customer".equals(userType)) {
             Customer customer = customerMapper.selectById(userId);
+            if (dto.getUsername() != null && !dto.getUsername().isEmpty()) {
+                customer.setUsername(dto.getUsername());
+            }
             if (dto.getSecurityQuestion() != null) {
                 customer.setSecurityQuestion(dto.getSecurityQuestion());
             }
@@ -118,7 +159,6 @@ public class AuthServiceImpl implements AuthService {
             }
             customerMapper.updateById(customer);
             return ResultVo.success("顾客信息修改成功", null);
-            
         } else if ("admin".equals(userType)) {
             Administrator admin = administratorMapper.selectById(userId);
             if (dto.getMerchantName() != null) {
@@ -127,45 +167,125 @@ public class AuthServiceImpl implements AuthService {
             administratorMapper.updateById(admin);
             return ResultVo.success("商家信息修改成功", null);
         }
-        
+
         return ResultVo.error("修改失败");
     }
 
-    // ========== 查询用户信息 ==========
-    // 商家可以查看任意用户，顾客只能查看自己的信息
+    // ========== 查询用户信息（含消费账单和订单ID列表） ==========
+@Override
+public ResultVo<UserInfoVo> getUserInfo(String userId, String currentUserId) {
+    String currentUserType = getUserType(currentUserId);
+    if (currentUserType == null) {
+        return ResultVo.error("当前用户不存在");
+    }
+    if (!"admin".equals(currentUserType) && !currentUserId.equals(userId)) {
+        return ResultVo.error("无权限查看他人信息");
+    }
+
+    String userType = getUserType(userId);
+    if (userType == null) {
+        return ResultVo.error("要查询的用户不存在");
+    }
+
+    UserInfoVo vo = new UserInfoVo();
+    vo.setUserId(userId);
+    vo.setUserType(userType);
+
+    if ("customer".equals(userType)) {
+        Customer customer = customerMapper.selectById(userId);
+        vo.setUsername(customer.getUsername());
+        vo.setSecurityQuestion(customer.getSecurityQuestion());
+        vo.setSecurityAnswer(customer.getSecurityAnswer());
+
+        // 账单信息
+        BigDecimal totalAmount = orderExtMapper.selectTotalAmountByUserId(userId);
+        Integer orderCount = orderExtMapper.selectCountByUserId(userId);
+        vo.setTotalAmount(totalAmount != null ? totalAmount : BigDecimal.ZERO);
+        vo.setOrderCount(orderCount != null ? orderCount : 0);
+        
+        // 新增：订单ID列表
+        List<String> orderIds = orderExtMapper.selectOrderIdsByUserId(userId);
+        vo.setOrderIds(orderIds);
+        
+    } else if ("admin".equals(userType)) {
+        Administrator admin = administratorMapper.selectById(userId);
+        vo.setMerchantName(admin.getMerchantName());
+        vo.setTotalAmount(BigDecimal.ZERO);
+        vo.setOrderCount(0);
+        vo.setOrderIds(null);
+    }
+
+    return ResultVo.success(vo);
+}
+
+    // ========== 商家查询用户列表（分页） ==========
     @Override
-    public ResultVo<UserInfoVo> getUserInfo(String userId, String currentUserId) {
-        // 1. 权限判断
-        String currentUserType = getUserType(currentUserId);
-        if (currentUserType == null) {
-            return ResultVo.error("当前用户不存在");
+    public ResultVo<Page<UserListVo>> queryUserList(UserQueryDto dto) {
+        String currentUserType = getUserType(dto.getCurrentUserId());
+        if (!"admin".equals(currentUserType)) {
+            return ResultVo.error("无权限查询用户列表");
         }
-        
-        // 如果不是商家，且查询的不是自己，则拒绝
-        if (!"admin".equals(currentUserType) && !currentUserId.equals(userId)) {
-            return ResultVo.error("无权限查看他人信息");
+
+        LambdaQueryWrapper<Customer> wrapper = new LambdaQueryWrapper<>();
+        if (dto.getUserId() != null && !dto.getUserId().isEmpty()) {
+            wrapper.like(Customer::getUserId, dto.getUserId());
         }
-        
-        // 2. 查询用户信息
-        String userType = getUserType(userId);
-        if (userType == null) {
-            return ResultVo.error("要查询的用户不存在");
+        if (dto.getUsername() != null && !dto.getUsername().isEmpty()) {
+            wrapper.like(Customer::getUsername, dto.getUsername());
         }
-        
-        UserInfoVo vo = new UserInfoVo();
-        vo.setUserId(userId);
-        vo.setUserType(userType);
-        
-        if ("customer".equals(userType)) {
-            Customer customer = customerMapper.selectById(userId);
+
+        Page<Customer> page = new Page<>(dto.getPage(), dto.getPageSize());
+        Page<Customer> customerPage = customerMapper.selectPage(page, wrapper);
+
+        Page<UserListVo> resultPage = new Page<>();
+        resultPage.setCurrent(customerPage.getCurrent());
+        resultPage.setSize(customerPage.getSize());
+        resultPage.setTotal(customerPage.getTotal());
+        resultPage.setPages(customerPage.getPages());
+
+        List<UserListVo> list = customerPage.getRecords().stream().map(customer -> {
+            UserListVo vo = new UserListVo();
+            vo.setUserId(customer.getUserId());
+            vo.setUsername(customer.getUsername());
             vo.setSecurityQuestion(customer.getSecurityQuestion());
-            vo.setSecurityAnswer(customer.getSecurityAnswer());
-        } else if ("admin".equals(userType)) {
-            Administrator admin = administratorMapper.selectById(userId);
-            vo.setMerchantName(admin.getMerchantName());
+
+            BigDecimal totalAmount = orderExtMapper.selectTotalAmountByUserId(customer.getUserId());
+            Integer orderCount = orderExtMapper.selectCountByUserId(customer.getUserId());
+            vo.setTotalAmount(totalAmount != null ? totalAmount : BigDecimal.ZERO);
+            vo.setOrderCount(orderCount != null ? orderCount : 0);
+
+            return vo;
+        }).collect(Collectors.toList());
+
+        resultPage.setRecords(list);
+        return ResultVo.success(resultPage);
+    }
+
+    // ========== 商家查询所有用户（不分页） ==========
+    @Override
+    public ResultVo<List<UserListVo>> getAllUsers(String currentUserId) {
+        String currentUserType = getUserType(currentUserId);
+        if (!"admin".equals(currentUserType)) {
+            return ResultVo.error("无权限查询用户列表");
         }
-        
-        return ResultVo.success(vo);
+
+        List<Customer> customers = customerMapper.selectList(null);
+
+        List<UserListVo> list = customers.stream().map(customer -> {
+            UserListVo vo = new UserListVo();
+            vo.setUserId(customer.getUserId());
+            vo.setUsername(customer.getUsername());
+            vo.setSecurityQuestion(customer.getSecurityQuestion());
+
+            BigDecimal totalAmount = orderExtMapper.selectTotalAmountByUserId(customer.getUserId());
+            Integer orderCount = orderExtMapper.selectCountByUserId(customer.getUserId());
+            vo.setTotalAmount(totalAmount != null ? totalAmount : BigDecimal.ZERO);
+            vo.setOrderCount(orderCount != null ? orderCount : 0);
+
+            return vo;
+        }).collect(Collectors.toList());
+
+        return ResultVo.success(list);
     }
 
     // ========== 修改密码 ==========
@@ -174,16 +294,16 @@ public class AuthServiceImpl implements AuthService {
         String userId = dto.getUserId();
         String verifyType = dto.getVerifyType();
         String newPassword = dto.getNewPassword();
-        
+
         User user = userMapper.selectById(userId);
         if (user == null) {
             return ResultVo.error("用户不存在");
         }
-        
+
         if (newPassword == null || newPassword.length() < 6) {
             return ResultVo.error("新密码长度至少6位");
         }
-        
+
         if ("password".equals(verifyType)) {
             String oldPassword = dto.getOldPassword();
             if (oldPassword == null || !user.getUserPassword().equals(oldPassword)) {
@@ -194,7 +314,6 @@ public class AuthServiceImpl implements AuthService {
             if (!"customer".equals(userType)) {
                 return ResultVo.error("商家账号不支持密保验证，请使用密码验证");
             }
-            
             Customer customer = customerMapper.selectById(userId);
             if (customer == null || !customer.getSecurityAnswer().equals(dto.getSecurityAnswer())) {
                 return ResultVo.error("密保答案错误");
@@ -202,14 +321,67 @@ public class AuthServiceImpl implements AuthService {
         } else {
             return ResultVo.error("验证方式错误");
         }
-        
+
         user.setUserPassword(newPassword);
         userMapper.updateById(user);
-        
+
         return ResultVo.success("密码修改成功", null);
     }
 
-    // ========== 辅助方法：判断用户类型 ==========
+    // ========== 找回密码 ==========
+    @Override
+    public ResultVo<String> forgotPassword(ForgotPasswordDto dto) {
+        String userId = dto.getUserId();
+        String securityAnswer = dto.getSecurityAnswer();
+        String newPassword = dto.getNewPassword();
+
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            return ResultVo.error("账号不存在");
+        }
+
+        if (newPassword == null || newPassword.length() < 6) {
+            return ResultVo.error("新密码长度至少6位");
+        }
+
+        String userType = getUserType(userId);
+        if (!"customer".equals(userType)) {
+            return ResultVo.error("商家账号请联系管理员找回密码");
+        }
+
+        Customer customer = customerMapper.selectById(userId);
+        if (customer == null || !customer.getSecurityAnswer().equals(securityAnswer)) {
+            return ResultVo.error("密保答案错误");
+        }
+
+        user.setUserPassword(newPassword);
+        userMapper.updateById(user);
+
+        return ResultVo.success("密码找回成功", null);
+    }
+
+    // ========== 注销账号 ==========
+    @Override
+    @Transactional
+    public ResultVo<String> deleteAccount(DeleteAccountDto dto) {
+        String userId = dto.getUserId();
+        String currentUserId = dto.getCurrentUserId();
+
+        if (!userId.equals(currentUserId)) {
+            return ResultVo.error("只能注销自己的账号");
+        }
+
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            return ResultVo.error("用户不存在");
+        }
+
+        userMapper.deleteById(userId);
+
+        return ResultVo.success("账号注销成功", null);
+    }
+
+    // ========== 辅助方法 ==========
     private String getUserType(String userId) {
         if (customerMapper.selectById(userId) != null) {
             return "customer";

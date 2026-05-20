@@ -2,17 +2,12 @@ package com.restaurant.demo.vo.user;
 
 import lombok.Data;
 import java.math.BigDecimal;
-import java.util.List;
 
 @Data
-public class UserInfoVo {
+public class UserListVo {
     private String userId;
     private String username;
-    private String userType;
     private String securityQuestion;
-    private String securityAnswer;
-    private String merchantName;
     private BigDecimal totalAmount;
     private Integer orderCount;
-    private List<String> orderIds;  // 新增：订单ID列表
 }

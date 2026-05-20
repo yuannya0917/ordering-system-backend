@@ -10,5 +10,4 @@ public class User {
     @TableId
     private String userId;
     private String userPassword;
-    // 删除 userType 字段
 }

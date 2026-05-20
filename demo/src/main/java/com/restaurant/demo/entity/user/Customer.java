@@ -9,6 +9,7 @@ import lombok.Data;
 public class Customer {
     @TableId
     private String userId;
+    private String username;
     private String securityQuestion;
     private String securityAnswer;
 }
