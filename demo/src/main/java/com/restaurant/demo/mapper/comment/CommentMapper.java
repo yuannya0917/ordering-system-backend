@@ -1,7 +1,7 @@
-package com.restaurant.demo.mapper.user;
+package com.restaurant.demo.mapper.comment;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.restaurant.demo.entity.user.Comment;
+import com.restaurant.demo.entity.comment.Comment;
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
