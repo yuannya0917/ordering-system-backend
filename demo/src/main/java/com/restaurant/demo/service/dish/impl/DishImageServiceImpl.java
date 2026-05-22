@@ -1,5 +1,6 @@
 package com.restaurant.demo.service.dish.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.restaurant.demo.entity.dish.DishImage;
 import com.restaurant.demo.mapper.dish.DishImageMapper;
 import com.restaurant.demo.service.dish.DishImageService;
@@ -27,31 +28,23 @@ public class DishImageServiceImpl implements DishImageService {
             throw new RuntimeException("文件不能为空");
         }
 
-        // 1. 获取原文件名后缀
         String originalFilename = file.getOriginalFilename();
         String suffix = originalFilename.substring(originalFilename.lastIndexOf("."));
-
-        // 2. 生成新文件名（用 dishId）
         String newFileName = dishId + suffix;
 
-        // 3. 创建保存目录
         String saveDir = uploadPath + "dish/";
         File dir = new File(saveDir);
         if (!dir.exists()) {
             dir.mkdirs();
         }
 
-        // 4. 删除旧图片文件（如果存在）
+        // 删除旧文件
         File oldFile = new File(saveDir + dishId + ".jpg");
-        if (oldFile.exists()) {
-            oldFile.delete();
-        }
+        if (oldFile.exists()) oldFile.delete();
         File oldFilePng = new File(saveDir + dishId + ".png");
-        if (oldFilePng.exists()) {
-            oldFilePng.delete();
-        }
+        if (oldFilePng.exists()) oldFilePng.delete();
 
-        // 5. 保存新图片
+        // 保存新文件
         File dest = new File(saveDir + newFileName);
         try {
             file.transferTo(dest);
@@ -59,23 +52,27 @@ public class DishImageServiceImpl implements DishImageService {
             throw new RuntimeException("文件保存失败");
         }
 
-        // 6. 保存/更新数据库
         String imageUrl = "/images/dish/" + newFileName;
-        DishImage existing = dishImageMapper.selectByDishId(dishId);
         
+        // 查询是否存在
+        LambdaQueryWrapper<DishImage> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DishImage::getDish_id, dishId);
+        DishImage existing = dishImageMapper.selectOne(wrapper);
+
         if (existing == null) {
             // 新增
             DishImage dishImage = new DishImage();
-            dishImage.setDishId(dishId);
-            dishImage.setDishName(dishName);
-            dishImage.setImageUrl(imageUrl);
-            dishImage.setCreateTime(LocalDateTime.now());
-            dishImage.setUpdateTime(LocalDateTime.now());
+            dishImage.setDish_id(dishId);
+            dishImage.setDish_name(dishName);
+            dishImage.setImage_url(imageUrl);
+            dishImage.setCreate_time(LocalDateTime.now());
+            dishImage.setUpdate_time(LocalDateTime.now());
             dishImageMapper.insert(dishImage);
         } else {
             // 更新
-            existing.setImageUrl(imageUrl);
-            existing.setUpdateTime(LocalDateTime.now());
+            existing.setDish_name(dishName);
+            existing.setImage_url(imageUrl);
+            existing.setUpdate_time(LocalDateTime.now());
             dishImageMapper.updateById(existing);
         }
 
@@ -84,23 +81,21 @@ public class DishImageServiceImpl implements DishImageService {
 
     @Override
     public DishImage getImageByDishId(String dishId) {
-        return dishImageMapper.selectByDishId(dishId);
+        LambdaQueryWrapper<DishImage> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DishImage::getDish_id, dishId);
+        return dishImageMapper.selectOne(wrapper);
     }
 
     @Override
     public boolean deleteImageByDishId(String dishId) {
-        // 删除本地文件
         String saveDir = uploadPath + "dish/";
         File file = new File(saveDir + dishId + ".jpg");
-        if (file.exists()) {
-            file.delete();
-        }
+        if (file.exists()) file.delete();
         File filePng = new File(saveDir + dishId + ".png");
-        if (filePng.exists()) {
-            filePng.delete();
-        }
-        
-        // 删除数据库记录
-        return dishImageMapper.deleteByDishId(dishId) > 0;
+        if (filePng.exists()) filePng.delete();
+
+        LambdaQueryWrapper<DishImage> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DishImage::getDish_id, dishId);
+        return dishImageMapper.delete(wrapper) > 0;
     }
 }

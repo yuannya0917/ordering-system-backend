@@ -14,10 +14,6 @@ public class DishImageController {
     @Autowired
     private DishImageService dishImageService;
 
-    /**
-     * 上传/更新菜品图片
-     * POST /api/dish-image/upload
-     */
     @PostMapping("/upload")
     public ResultVo<String> uploadImage(
             @RequestParam("dishId") String dishId,
@@ -31,10 +27,6 @@ public class DishImageController {
         }
     }
 
-    /**
-     * 根据菜品ID查询图片
-     * GET /api/dish-image/{dishId}
-     */
     @GetMapping("/{dishId}")
     public ResultVo<DishImage> getImageByDishId(@PathVariable String dishId) {
         DishImage image = dishImageService.getImageByDishId(dishId);
@@ -45,10 +37,6 @@ public class DishImageController {
         }
     }
 
-    /**
-     * 根据菜品ID删除图片
-     * DELETE /api/dish-image/{dishId}
-     */
     @DeleteMapping("/{dishId}")
     public ResultVo<String> deleteImageByDishId(@PathVariable String dishId) {
         boolean result = dishImageService.deleteImageByDishId(dishId);

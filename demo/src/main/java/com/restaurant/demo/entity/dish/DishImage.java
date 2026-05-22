@@ -10,9 +10,10 @@ import java.time.LocalDateTime;
 public class DishImage {
     @TableId
     private Integer id;
-    private String dishId;
-    private String dishName;
-    private String imageUrl;
-    private LocalDateTime createTime;
-    private LocalDateTime updateTime;
+    
+    private String dish_id;      // 改成 dish_id，不是 dishId
+    private String dish_name;    // 改成 dish_name，不是 dishName
+    private String image_url;    // 改成 image_url，不是 imageUrl
+    private LocalDateTime create_time;
+    private LocalDateTime update_time;
 }
