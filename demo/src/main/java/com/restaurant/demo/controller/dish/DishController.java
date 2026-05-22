@@ -29,12 +29,6 @@ public class DishController {
     
     private final DishService dishService;
     
-    @GetMapping("/list")
-    public ResultVo<List<DishVo>> getDishList(@RequestParam String menuId) {
-        List<DishVo> list = dishService.getDishList(menuId);
-        return ResultVo.success(list);
-    }
-    
     @GetMapping("/get/{dishId}")
     public ResultVo<DishVo> getDish(@PathVariable String dishId) {
         DishVo dishVo = dishService.getDish(dishId);
@@ -57,5 +51,13 @@ public class DishController {
     public ResultVo<Boolean> deleteDish(@RequestBody DeleteDishDto deleteDishDto) {
         boolean result = dishService.deleteDish(deleteDishDto.getDishId());
         return ResultVo.success(result);
+    }
+    @GetMapping("/list")
+    public ResultVo<List<DishVo>> getDishList(
+        @RequestParam(required = false) String dishId,
+        @RequestParam(required = false) String dishName,
+        @RequestParam(required = false) String menuId) {
+    List<DishVo> list = dishService.getDishList(dishId, dishName, menuId);
+    return ResultVo.success(list);
     }
 }

@@ -2,6 +2,7 @@
 package com.restaurant.demo.service.dish.impl;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.BeanUtils;
@@ -24,16 +25,6 @@ import lombok.RequiredArgsConstructor;
 public class DishServiceImpl extends ServiceImpl<DishMapper, Dish> implements DishService {
     
     private final DishMapper dishMapper;
-    
-    @Override
-    public List<DishVo> getDishList(String menuId) {
-        List<Dish> dishes = dishMapper.selectDishListByMenuId(menuId);
-        return dishes.stream().map(dish -> {
-            DishVo vo = new DishVo();
-            BeanUtils.copyProperties(dish, vo);
-            return vo;
-        }).collect(Collectors.toList());
-    }
     
     @Override
     public DishVo getDish(String dishId) {
@@ -100,5 +91,19 @@ public class DishServiceImpl extends ServiceImpl<DishMapper, Dish> implements Di
             throw new RuntimeException("菜品不存在");
         }
         return this.removeById(dishId);
+    }
+    @Override
+    public List<DishVo> getDishList(String dishId, String dishName, String menuId) {
+    List<Map<String, Object>> results = dishMapper.selectDishList(dishId, dishName, menuId);
+    
+    return results.stream().map(result -> {
+        DishVo vo = new DishVo();
+        vo.setDishImage((String) result.get("dishID"));
+        vo.setDishName((String) result.get("dishName"));
+        vo.setDishPrice((Integer) result.get("dishPrice"));
+        vo.setDishIntroduction((String) result.get("dishIntroduction"));
+        vo.setMenuName((String) result.get("menuName"));
+        return vo;
+    }).collect(Collectors.toList());
     }
 }

@@ -1,6 +1,7 @@
 package com.restaurant.demo.service.order.impl;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,7 @@ import com.restaurant.demo.service.order.OrderService;
 import com.restaurant.demo.vo.order.CartItemVo;
 import com.restaurant.demo.vo.order.CartVo;
 import com.restaurant.demo.vo.order.OrderVo;
+import com.restaurant.demo.vo.order.TotalAmountVo;
 
 import lombok.RequiredArgsConstructor;
 
@@ -133,6 +135,7 @@ public OrderVo submitOrder(SubmitOrderDto submitOrderDto) {
         return orders.stream().map(order -> {
             OrderVo vo = new OrderVo();
             vo.setOrderId(order.getOrderId());
+            vo.setUserId(order.getUserId());
             vo.setOrderPrice(order.getOrderPrice());
             vo.setOrderTime(order.getOrderTime());
             vo.setOrderNote(order.getOrderNote());
@@ -149,5 +152,35 @@ public OrderVo submitOrder(SubmitOrderDto submitOrderDto) {
     }
     order.setOrderStatus(orderStatus);
     return this.updateById(order);
+}
+     @Override
+    public TotalAmountVo getTotalAmount(String startTime, String endTime, String orderStatus) {
+    LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
+    
+    // 时间范围过滤
+    if (startTime != null && !startTime.isEmpty()) {
+        wrapper.ge(Order::getOrderTime, LocalDateTime.parse(startTime, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+    }
+    if (endTime != null && !endTime.isEmpty()) {
+        wrapper.le(Order::getOrderTime, LocalDateTime.parse(endTime, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+    }
+    
+    // 订单状态过滤
+    if (orderStatus != null && !orderStatus.isEmpty()) {
+        wrapper.eq(Order::getOrderStatus, orderStatus);
+    } else {
+        // 默认只统计已完成的订单
+        wrapper.eq(Order::getOrderStatus, "3");
+    }
+    
+    List<Order> orders = this.list(wrapper);
+    
+    TotalAmountVo vo = new TotalAmountVo();
+    vo.setOrderCount(orders.size());
+    vo.setTotalAmount(orders.stream().mapToInt(Order::getOrderPrice).sum());
+    vo.setStartTime(startTime);
+    vo.setEndTime(endTime);
+    
+    return vo;
 }
 }

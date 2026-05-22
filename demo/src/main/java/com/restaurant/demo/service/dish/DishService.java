@@ -11,7 +11,6 @@ import com.restaurant.demo.vo.dish.DishVo;
 
 public interface DishService extends IService<Dish> {
     
-    List<DishVo> getDishList(String menuId);
     
     DishVo getDish(String dishId);
     
@@ -20,4 +19,6 @@ public interface DishService extends IService<Dish> {
     boolean updateDish(UpdateDishDto updateDishDto);
     
     boolean deleteDish(String dishId);
+    // DishService.java
+    List<DishVo> getDishList(String dishId, String dishName, String menuId);
 }

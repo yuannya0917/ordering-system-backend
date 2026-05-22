@@ -19,7 +19,8 @@ import com.restaurant.demo.service.order.OrderService;
 import com.restaurant.demo.vo.ResultVo;
 import com.restaurant.demo.vo.order.CartVo;
 import com.restaurant.demo.vo.order.OrderVo;
-
+import com.restaurant.demo.vo.order.TotalAmountVo;
+import org.springframework.web.bind.annotation.RequestParam;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -64,6 +65,15 @@ public class OrderController {
         updateOrderStatusDto.getOrderId(), 
         updateOrderStatusDto.getOrderStatus()
     );
+    return ResultVo.success(result);
+    }
+    // OrderController.java 新增
+    @GetMapping("/totalAmount")
+    public ResultVo<TotalAmountVo> getTotalAmount(
+        @RequestParam(required = false) String startTime,
+        @RequestParam(required = false) String endTime,
+        @RequestParam(required = false) String orderStatus) {
+    TotalAmountVo result = orderService.getTotalAmount(startTime, endTime, orderStatus);
     return ResultVo.success(result);
     }
 }
