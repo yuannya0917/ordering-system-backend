@@ -209,3 +209,20 @@ INSERT INTO `user` VALUES ('user01', '123456');
 INSERT INTO `user` VALUES ('user02', '456789');
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+
+-- ----------------------------
+-- 新增菜品图片
+-- ----------------------------
+DROP TABLE IF EXISTS `dish_image`;
+CREATE TABLE `dish_image` (
+  `id` INT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `dish_id` VARCHAR(11) NOT NULL COMMENT '菜品ID，关联dish表',
+  `dish_name` VARCHAR(40) NOT NULL COMMENT '菜品名称',
+  `image_url` VARCHAR(255) NOT NULL COMMENT '图片地址',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_dish_id` (`dish_id`) USING BTREE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '菜品图片表';
+
