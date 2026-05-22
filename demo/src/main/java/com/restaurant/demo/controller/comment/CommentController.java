@@ -1,5 +1,6 @@
 package com.restaurant.demo.controller.comment;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.restaurant.demo.dto.comment.CommentAddDTO;
 import com.restaurant.demo.dto.comment.CommentVO;
 import com.restaurant.demo.entity.comment.Comment;
@@ -25,7 +26,7 @@ public class CommentController {
     private CommentService commentService;
 
     /**
-     * 添加评论（修复 commentId 未设置的问题）
+     * 添加评论
      */
     @PostMapping("/add")
     public ResponseEntity<Map<String, Object>> addComment(@RequestBody CommentAddDTO dto) {
@@ -47,19 +48,9 @@ public class CommentController {
             return ResponseEntity.badRequest().body(response);
         }
 
-        // 生成评论ID
         String commentId = generateCommentId();
-
-        // 构建评论实体
-        Comment comment = new Comment();
-        comment.setCommentId(commentId);
-        comment.setOrderId(dto.getOrderId());
-        comment.setUserId(dto.getUserId());
-        comment.setContent(dto.getContent());
-        comment.setPublishTime(LocalDateTime.now());
-
         try {
-            boolean saved = commentService.save(comment);
+            boolean saved = commentService.addComment(dto.getOrderId(), dto.getUserId(), dto.getContent());
             if (saved) {
                 response.put("success", true);
                 response.put("commentId", commentId);
@@ -69,6 +60,10 @@ public class CommentController {
                 response.put("message", "评论失败，请稍后重试");
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
             }
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "系统错误：" + e.getMessage());
@@ -130,12 +125,26 @@ public class CommentController {
         return ResponseEntity.ok(voList);
     }
 
+    /**
+     * 管理员查询所有评论（按时间倒序）
+     */
+    @GetMapping("/admin/list")
+    public ResponseEntity<List<CommentVO>> getAllCommentsForAdmin() {
+        List<Comment> comments = commentService.list(
+            new LambdaQueryWrapper<Comment>().orderByDesc(Comment::getPublishTime)
+        );
+        List<CommentVO> voList = comments.stream()
+                .map(this::convertToVO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(voList);
+    }
+
     // ---------- 私有辅助方法 ----------
     private String generateCommentId() {
         long millis = System.currentTimeMillis();
         String timePart = Long.toString(millis % 10000000); // 后7位
         int random = ThreadLocalRandom.current().nextInt(10);
-        return "cmt" + timePart + random;
+        return "cmt" + timePart + random; // 总长 3+7+1=11，符合 varchar(11)
     }
 
     private CommentVO convertToVO(Comment comment) {
