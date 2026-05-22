@@ -65,8 +65,19 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
     return this.updateById(menu);
 }
 @Override
-public List<MenuVo> getAllMenus() {
-    List<Menu> menus = this.list();
+public List<MenuVo> getAllMenus(String menuName) {
+    LambdaQueryWrapper<Menu> wrapper = new LambdaQueryWrapper<>();
+    
+    // 添加模糊查询条件
+    if (menuName != null && !menuName.trim().isEmpty()) {
+        wrapper.like(Menu::getMenuName, menuName);
+    }
+    
+    // 按创建时间排序
+    wrapper.orderByDesc(Menu::getCreateTime);
+    
+    List<Menu> menus = this.list(wrapper);
+    
     return menus.stream().map(menu -> {
         MenuVo vo = new MenuVo();
         BeanUtils.copyProperties(menu, vo);

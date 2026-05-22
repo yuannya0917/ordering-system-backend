@@ -170,7 +170,7 @@ public OrderVo submitOrder(SubmitOrderDto submitOrderDto) {
         wrapper.eq(Order::getOrderStatus, orderStatus);
     } else {
         // 默认只统计已完成的订单
-        wrapper.eq(Order::getOrderStatus, "3");
+        wrapper.eq(Order::getOrderStatus, "2");
     }
     
     List<Order> orders = this.list(wrapper);

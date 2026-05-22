@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.restaurant.demo.dto.dish.AddMenuDto;
@@ -46,10 +47,11 @@ public class MenuController {
     return ResultVo.success(result);
     }
     @GetMapping("/list")
-    public ResultVo<List<MenuVo>> getAllMenus() {
-    List<MenuVo> menus = menuService.getAllMenus();
+    public ResultVo<List<MenuVo>> getAllMenus(
+        @RequestParam(required = false) String menuName) {
+    List<MenuVo> menus = menuService.getAllMenus(menuName);
     return ResultVo.success(menus);
-}
+    }
 
     @GetMapping("/get/{menuId}")
     public ResultVo<MenuVo> getMenuById(@PathVariable String menuId) {

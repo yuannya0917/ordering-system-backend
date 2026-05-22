@@ -1,4 +1,3 @@
-// DishService.java
 package com.restaurant.demo.service.dish;
 
 import java.util.List;
@@ -11,6 +10,7 @@ import com.restaurant.demo.vo.dish.DishVo;
 
 public interface DishService extends IService<Dish> {
     
+    List<DishVo> getDishList(String dishId, String dishName, String menuId);  // 修改这里
     
     DishVo getDish(String dishId);
     
@@ -19,6 +19,4 @@ public interface DishService extends IService<Dish> {
     boolean updateDish(UpdateDishDto updateDishDto);
     
     boolean deleteDish(String dishId);
-    // DishService.java
-    List<DishVo> getDishList(String dishId, String dishName, String menuId);
 }
