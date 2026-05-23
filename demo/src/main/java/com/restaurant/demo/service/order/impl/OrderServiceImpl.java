@@ -200,4 +200,37 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         
         return vo;
     }
+    @Override
+public List<OrderVo> getAllOrders(String userId, String orderStatus) {
+    LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
+    
+    // 按用户ID筛选
+    if (userId != null && !userId.trim().isEmpty()) {
+        wrapper.eq(Order::getUserId, userId);
+    }
+    
+    // 按订单状态筛选
+    if (orderStatus != null && !orderStatus.trim().isEmpty()) {
+        wrapper.eq(Order::getOrderStatus, orderStatus);
+    }
+    
+    // 按下单时间倒序
+    wrapper.orderByDesc(Order::getOrderTime);
+    
+    List<Order> orders = this.list(wrapper);
+    
+    return orders.stream().map(this::convertToOrderVo).collect(Collectors.toList());
+}
+
+// 提取转换方法
+private OrderVo convertToOrderVo(Order order) {
+    OrderVo vo = new OrderVo();
+    vo.setOrderId(order.getOrderId());
+    vo.setUserId(order.getUserId());
+    vo.setOrderPrice(order.getOrderPrice());
+    vo.setOrderTime(order.getOrderTime());
+    vo.setOrderNote(order.getOrderNote());
+    vo.setOrderStatus(order.getOrderStatus());
+    return vo;
+}
 }

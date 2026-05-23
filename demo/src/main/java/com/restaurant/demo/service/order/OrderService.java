@@ -23,6 +23,6 @@ public interface OrderService extends IService<Order> {
     boolean updateOrderStatus(String orderId, String orderStatus);
     
     List<OrderVo> getHistoryOrders(String userId);
-    
+    List<OrderVo> getAllOrders(String userId, String orderStatus);
     TotalAmountVo getTotalAmount(String startTime, String endTime, String orderStatus);  // 新增
 }

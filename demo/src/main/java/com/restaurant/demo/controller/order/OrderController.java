@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.restaurant.demo.dto.order.AddToCartDto;
@@ -20,7 +21,7 @@ import com.restaurant.demo.vo.ResultVo;
 import com.restaurant.demo.vo.order.CartVo;
 import com.restaurant.demo.vo.order.OrderVo;
 import com.restaurant.demo.vo.order.TotalAmountVo;
-import org.springframework.web.bind.annotation.RequestParam;
+
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -75,5 +76,12 @@ public class OrderController {
         @RequestParam(required = false) String orderStatus) {
     TotalAmountVo result = orderService.getTotalAmount(startTime, endTime, orderStatus);
     return ResultVo.success(result);
+    }
+    @GetMapping("/all")
+    public ResultVo<List<OrderVo>> getAllOrders(
+        @RequestParam(required = false) String userId,
+        @RequestParam(required = false) String orderStatus){
+    List<OrderVo> orders = orderService.getAllOrders(userId, orderStatus);
+    return ResultVo.success(orders);
     }
 }
