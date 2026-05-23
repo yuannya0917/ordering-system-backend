@@ -201,7 +201,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return vo;
     }
     @Override
-public List<OrderVo> getAllOrders(String userId, String orderStatus) {
+public List<OrderVo> getAllOrders(String userId, String orderStatus, String startTime, String endTime) {
     LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
     
     // 按用户ID筛选
@@ -214,6 +214,16 @@ public List<OrderVo> getAllOrders(String userId, String orderStatus) {
         wrapper.eq(Order::getOrderStatus, orderStatus);
     }
     
+    // 按开始时间筛选
+    if (startTime != null && !startTime.trim().isEmpty()) {
+        wrapper.ge(Order::getOrderTime, LocalDateTime.parse(startTime, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+    }
+    
+    // 按结束时间筛选
+    if (endTime != null && !endTime.trim().isEmpty()) {
+        wrapper.le(Order::getOrderTime, LocalDateTime.parse(endTime, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+    }
+    
     // 按下单时间倒序
     wrapper.orderByDesc(Order::getOrderTime);
     
@@ -222,7 +232,6 @@ public List<OrderVo> getAllOrders(String userId, String orderStatus) {
     return orders.stream().map(this::convertToOrderVo).collect(Collectors.toList());
 }
 
-// 提取转换方法
 private OrderVo convertToOrderVo(Order order) {
     OrderVo vo = new OrderVo();
     vo.setOrderId(order.getOrderId());
