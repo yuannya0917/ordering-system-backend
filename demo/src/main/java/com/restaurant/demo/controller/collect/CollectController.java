@@ -18,7 +18,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/collect")
+@RequestMapping("/api/collect")
 public class CollectController {
 
     @Autowired
