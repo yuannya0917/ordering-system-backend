@@ -12,17 +12,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // 注册 WebSocket 连接端点，前端通过这个地址连接
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")
-                .withSockJS();
+                .setAllowedOriginPatterns("*");
+        // 删除 .withSockJS() 这一行
     }
     
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        // 消息代理前缀，前端订阅这个前缀的地址接收消息
         registry.enableSimpleBroker("/topic", "/queue");
-        // 客户端发送消息的前缀
         registry.setApplicationDestinationPrefixes("/app");
     }
 }
