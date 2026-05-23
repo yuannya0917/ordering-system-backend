@@ -15,7 +15,7 @@ public interface OrderService extends IService<Order> {
     void addToCart(AddToCartDto addToCartDto);
     
     void removeFromCart(String userId, String dishId);
-    
+    void notifyMerchantNewOrder(OrderVo orderVo);
     CartVo getCart(String userId);
     
     OrderVo submitOrder(SubmitOrderDto submitOrderDto);

@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +29,9 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements OrderService {
+    
+    private final OrderMapper orderMapper;
+    private final SimpMessagingTemplate messagingTemplate;
     
     // 购物车存储结构：userId -> Map<dishId, CartItemVo>
     private Map<String, Map<String, CartItemVo>> carts = new ConcurrentHashMap<>();
@@ -79,50 +83,61 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     }
     
     @Override
-@Transactional(rollbackFor = Exception.class)
-public OrderVo submitOrder(SubmitOrderDto submitOrderDto) {
-    String userId = submitOrderDto.getUserId();
-    String orderId = submitOrderDto.getOrderId();  // 获取手动传入的 orderId
-    
-    if (orderId == null || orderId.trim().isEmpty()) {
-        throw new RuntimeException("订单ID不能为空");
+    @Transactional(rollbackFor = Exception.class)
+    public OrderVo submitOrder(SubmitOrderDto submitOrderDto) {
+        String userId = submitOrderDto.getUserId();
+        String orderId = submitOrderDto.getOrderId();
+        
+        if (orderId == null || orderId.trim().isEmpty()) {
+            throw new RuntimeException("订单ID不能为空");
+        }
+        
+        Map<String, CartItemVo> userCart = carts.get(userId);
+        
+        if (userCart == null || userCart.isEmpty()) {
+            throw new RuntimeException("购物车为空，无法提交订单");
+        }
+        
+        // 计算总价
+        int totalPrice = userCart.values().stream()
+                .mapToInt(CartItemVo::getTotalPrice)
+                .sum();
+        
+        // 创建订单
+        Order order = new Order();
+        order.setOrderId(orderId);
+        order.setUserId(userId);
+        order.setOrderPrice(totalPrice);
+        order.setOrderNote(submitOrderDto.getOrderNote());
+        order.setOrderTime(LocalDateTime.now());
+        order.setOrderStatus("0");  // 0:待确认
+        
+        this.save(order);
+        
+        // 清空用户购物车
+        carts.remove(userId);
+        
+        // 返回订单VO
+        OrderVo orderVo = new OrderVo();
+        orderVo.setOrderId(order.getOrderId());
+        orderVo.setUserId(order.getUserId());
+        orderVo.setOrderPrice(order.getOrderPrice());
+        orderVo.setOrderTime(order.getOrderTime());
+        orderVo.setOrderNote(order.getOrderNote());
+        orderVo.setOrderStatus(order.getOrderStatus());
+        
+        // 推送新订单通知给商家
+        notifyMerchantNewOrder(orderVo);
+        
+        return orderVo;
     }
     
-    Map<String, CartItemVo> userCart = carts.get(userId);
-    
-    if (userCart == null || userCart.isEmpty()) {
-        throw new RuntimeException("购物车为空，无法提交订单");
+    @Override
+    public void notifyMerchantNewOrder(OrderVo orderVo) {
+        // 推送到商家订阅的频道
+        messagingTemplate.convertAndSend("/topic/merchant/new-orders", orderVo);
+        System.out.println("新订单已推送: " + orderVo.getOrderId());
     }
-    
-    // 计算总价
-    int totalPrice = userCart.values().stream()
-            .mapToInt(CartItemVo::getTotalPrice)
-            .sum();
-    
-    // 创建订单
-    Order order = new Order();
-    order.setOrderId(orderId);  // 使用手动传入的 orderId
-    order.setUserId(userId);
-    order.setOrderPrice(totalPrice);
-    order.setOrderNote(submitOrderDto.getOrderNote());
-    order.setOrderTime(LocalDateTime.now());
-    order.setOrderStatus("0");
-    
-    this.save(order);
-    
-    // 清空用户购物车
-    carts.remove(userId);
-    
-    // 返回订单VO
-    OrderVo orderVo = new OrderVo();
-    orderVo.setOrderId(order.getOrderId());
-    orderVo.setOrderPrice(order.getOrderPrice());
-    orderVo.setOrderTime(order.getOrderTime());
-    orderVo.setOrderNote(order.getOrderNote());
-    orderVo.setOrderStatus(order.getOrderStatus());
-    
-    return orderVo;
-}
     
     @Override
     public List<OrderVo> getHistoryOrders(String userId) {
@@ -143,44 +158,46 @@ public OrderVo submitOrder(SubmitOrderDto submitOrderDto) {
             return vo;
         }).collect(Collectors.toList());
     }
+    
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean updateOrderStatus(String orderId, String orderStatus) {
-    Order order = this.getById(orderId);
-    if (order == null) {
-        throw new RuntimeException("订单不存在");
+        Order order = this.getById(orderId);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
+        order.setOrderStatus(orderStatus);
+        return this.updateById(order);
     }
-    order.setOrderStatus(orderStatus);
-    return this.updateById(order);
-}
-     @Override
+    
+    @Override
     public TotalAmountVo getTotalAmount(String startTime, String endTime, String orderStatus) {
-    LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
-    
-    // 时间范围过滤
-    if (startTime != null && !startTime.isEmpty()) {
-        wrapper.ge(Order::getOrderTime, LocalDateTime.parse(startTime, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
+        
+        // 时间范围过滤
+        if (startTime != null && !startTime.isEmpty()) {
+            wrapper.ge(Order::getOrderTime, LocalDateTime.parse(startTime, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        }
+        if (endTime != null && !endTime.isEmpty()) {
+            wrapper.le(Order::getOrderTime, LocalDateTime.parse(endTime, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        }
+        
+        // 订单状态过滤
+        if (orderStatus != null && !orderStatus.isEmpty()) {
+            wrapper.eq(Order::getOrderStatus, orderStatus);
+        } else {
+            // 默认统计状态为 '2'（制作中）的订单
+            wrapper.eq(Order::getOrderStatus, "2");
+        }
+        
+        List<Order> orders = this.list(wrapper);
+        
+        TotalAmountVo vo = new TotalAmountVo();
+        vo.setOrderCount(orders.size());
+        vo.setTotalAmount(orders.stream().mapToInt(Order::getOrderPrice).sum());
+        vo.setStartTime(startTime);
+        vo.setEndTime(endTime);
+        
+        return vo;
     }
-    if (endTime != null && !endTime.isEmpty()) {
-        wrapper.le(Order::getOrderTime, LocalDateTime.parse(endTime, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-    }
-    
-    // 订单状态过滤
-    if (orderStatus != null && !orderStatus.isEmpty()) {
-        wrapper.eq(Order::getOrderStatus, orderStatus);
-    } else {
-        // 默认只统计已完成的订单
-        wrapper.eq(Order::getOrderStatus, "2");
-    }
-    
-    List<Order> orders = this.list(wrapper);
-    
-    TotalAmountVo vo = new TotalAmountVo();
-    vo.setOrderCount(orders.size());
-    vo.setTotalAmount(orders.stream().mapToInt(Order::getOrderPrice).sum());
-    vo.setStartTime(startTime);
-    vo.setEndTime(endTime);
-    
-    return vo;
-}
 }

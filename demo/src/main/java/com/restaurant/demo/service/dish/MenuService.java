@@ -14,7 +14,6 @@ public interface MenuService extends IService<Menu> {
     
     boolean deleteMenu(String menuId);
     boolean updateMenu(UpdateMenuDto updateMenuDto);
-    List<com.restaurant.demo.vo.dish.MenuVo> getAllMenus();  // 使用完整类名
     List<MenuVo> getAllMenus(String menuName); 
     com.restaurant.demo.vo.dish.MenuVo getMenuById(String menuId);
     

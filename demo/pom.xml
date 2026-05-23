@@ -41,10 +41,14 @@
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
+			<version>1.18.38</version>
 			<optional>true</optional>
 		</dependency>
-
-		<!-- ====================== 我帮你加的关键依赖 ====================== -->
+		<!-- WebSocket -->
+		<dependency>
+    		<groupId>org.springframework.boot</groupId>
+    		<artifactId>spring-boot-starter-websocket</artifactId>
+		</dependency>
 		<!-- MyBatis-Plus Spring Boot 3 专用版本 -->
 		<dependency>
 			<groupId>com.baomidou</groupId>
