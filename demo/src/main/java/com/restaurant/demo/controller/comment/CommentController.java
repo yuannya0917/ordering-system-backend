@@ -25,6 +25,9 @@ public class CommentController {
     @Autowired
     private CommentService commentService;
 
+    /**
+     * 添加评论
+     */
     @PostMapping("/add")
     public ResponseEntity<Map<String, Object>> addComment(@RequestBody CommentAddDTO dto) {
         Map<String, Object> response = new HashMap<>();
@@ -82,6 +85,9 @@ public class CommentController {
         }
     }
 
+    /**
+     * 普通用户删除自己的评论
+     */
     @DeleteMapping("/delete")
     public ResponseEntity<Map<String, Object>> deleteComment(@RequestParam String commentId,
                                                               @RequestParam String userId) {
@@ -92,7 +98,10 @@ public class CommentController {
             response.put("message", "参数不完整");
             return ResponseEntity.badRequest().body(response);
         }
-        boolean deleted = commentService.deleteComment(commentId, userId);
+        LambdaQueryWrapper<Comment> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Comment::getCommentId, commentId)
+               .eq(Comment::getUserId, userId);
+        boolean deleted = commentService.remove(wrapper);
         response.put("success", deleted);
         if (deleted) {
             response.put("message", "删除成功");
@@ -103,6 +112,34 @@ public class CommentController {
         }
     }
 
+    /**
+     * 商家删除任意评论（不需要 userId）
+     */
+    @DeleteMapping("/admin/delete/{commentId}")
+    public ResponseEntity<Map<String, Object>> adminDeleteComment(@PathVariable String commentId) {
+        Map<String, Object> response = new HashMap<>();
+        
+        if (commentId == null || commentId.trim().isEmpty()) {
+            response.put("success", false);
+            response.put("message", "评论ID不能为空");
+            return ResponseEntity.badRequest().body(response);
+        }
+        
+        boolean deleted = commentService.removeById(commentId);
+        if (deleted) {
+            response.put("success", true);
+            response.put("message", "删除成功");
+            return ResponseEntity.ok(response);
+        } else {
+            response.put("success", false);
+            response.put("message", "删除失败，评论不存在");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+
+    /**
+     * 查询某个订单的所有评论
+     */
     @GetMapping("/order/{orderId}")
     public ResponseEntity<List<CommentVO>> getCommentsByOrderId(@PathVariable String orderId) {
         if (orderId == null || orderId.trim().isEmpty()) {
@@ -115,6 +152,9 @@ public class CommentController {
         return ResponseEntity.ok(voList);
     }
 
+    /**
+     * 查询某个用户的所有评论
+     */
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<CommentVO>> getCommentsByUserId(@PathVariable String userId) {
         if (userId == null || userId.trim().isEmpty()) {
@@ -127,6 +167,9 @@ public class CommentController {
         return ResponseEntity.ok(voList);
     }
 
+    /**
+     * 管理员查询所有评论（按时间倒序）
+     */
     @GetMapping("/admin/list")
     public ResponseEntity<List<CommentVO>> getAllCommentsForAdmin() {
         List<Comment> comments = commentService.list(
@@ -138,6 +181,7 @@ public class CommentController {
         return ResponseEntity.ok(voList);
     }
 
+    // ---------- 私有辅助方法 ----------
     private String generateCommentId() {
         // 使用UUID的前11位，确保长度固定为11
         String uuid = UUID.randomUUID().toString().replace("-", "");
