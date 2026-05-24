@@ -14,7 +14,6 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @RestController
@@ -88,7 +87,6 @@ public class CollectController {
     @GetMapping("/list")
     public ResponseEntity<List<CollectVO>> listCollect(@RequestParam String userId) {
         if (userId == null || userId.trim().isEmpty()) {
-            // 这里返回空列表 + 400 不合理，改为返回400错误
             return ResponseEntity.badRequest().build();
         }
         List<Collect> collects = collectService.getCollectByUserId(userId);
@@ -111,10 +109,12 @@ public class CollectController {
 
     // ---------- 私有辅助方法 ----------
     private String generateCollectId() {
-        long millis = System.currentTimeMillis();
-        String timePart = Long.toString(millis % 100000);
-        int randomDigit = ThreadLocalRandom.current().nextInt(10);
-        return "coll" + timePart + randomDigit;
+        // 使用时间戳后11位，确保长度固定为11
+        String timestamp = String.valueOf(System.currentTimeMillis());
+        if (timestamp.length() > 11) {
+            timestamp = timestamp.substring(timestamp.length() - 11);
+        }
+        return timestamp;
     }
 
     private CollectVO convertToVO(Collect collect) {
