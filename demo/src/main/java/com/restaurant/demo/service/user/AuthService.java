@@ -18,4 +18,7 @@ public interface AuthService {
     ResultVo<String> deleteAccount(DeleteAccountDto deleteAccountDto);
     ResultVo<Page<UserListVo>> queryUserList(UserQueryDto userQueryDto);
     ResultVo<List<UserListVo>> getAllUsers(String currentUserId);
+
+    // 获取密保问题
+    ResultVo<String> getSecurityQuestion(String userId);
 }

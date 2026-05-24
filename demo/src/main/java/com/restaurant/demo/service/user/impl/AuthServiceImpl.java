@@ -7,6 +7,10 @@ import com.restaurant.demo.entity.user.Administrator;
 import com.restaurant.demo.entity.user.Customer;
 import com.restaurant.demo.entity.user.User;
 import com.restaurant.demo.entity.order.Order;
+import com.restaurant.demo.mapper.collect.CollectMapper;
+import com.restaurant.demo.mapper.comment.CommentMapper;
+import com.restaurant.demo.mapper.order.OrderDetailMapper;
+import com.restaurant.demo.mapper.order.OrderMapper;
 import com.restaurant.demo.mapper.user.AdministratorMapper;
 import com.restaurant.demo.mapper.user.CustomerMapper;
 import com.restaurant.demo.mapper.user.UserMapper;
@@ -19,6 +23,18 @@ import com.restaurant.demo.vo.user.UserListVo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+
+import com.restaurant.demo.entity.order.Order;
+import com.restaurant.demo.entity.order.OrderDetail;
+import com.restaurant.demo.entity.comment.Comment;
+import com.restaurant.demo.entity.collect.Collect;
+import com.restaurant.demo.mapper.order.OrderMapper;
+import com.restaurant.demo.mapper.order.OrderDetailMapper;
+import com.restaurant.demo.mapper.comment.CommentMapper;
+import com.restaurant.demo.mapper.collect.CollectMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import java.util.List;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -38,6 +54,18 @@ public class AuthServiceImpl implements AuthService {
 
     @Autowired
     private OrderExtMapper orderExtMapper;
+
+    @Autowired
+private OrderMapper orderMapper;
+
+@Autowired
+private OrderDetailMapper orderDetailMapper;
+
+@Autowired
+private CommentMapper commentMapper;
+
+@Autowired
+private CollectMapper collectMapper;
 
     // ========== 注册 ==========
     @Override
@@ -361,26 +389,79 @@ public ResultVo<UserInfoVo> getUserInfo(String userId, String currentUserId) {
     }
 
     // ========== 注销账号 ==========
-    @Override
-    @Transactional
-    public ResultVo<String> deleteAccount(DeleteAccountDto dto) {
-        String userId = dto.getUserId();
-        String currentUserId = dto.getCurrentUserId();
+@Override
+@Transactional
+public ResultVo<String> deleteAccount(DeleteAccountDto dto) {
+    String userId = dto.getUserId();
+    String currentUserId = dto.getCurrentUserId();
 
-        if (!userId.equals(currentUserId)) {
-            return ResultVo.error("只能注销自己的账号");
-        }
-
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            return ResultVo.error("用户不存在");
-        }
-
-        userMapper.deleteById(userId);
-
-        return ResultVo.success("账号注销成功", null);
+    if (!userId.equals(currentUserId)) {
+        return ResultVo.error("只能注销自己的账号");
     }
 
+    User user = userMapper.selectById(userId);
+    if (user == null) {
+        return ResultVo.error("用户不存在");
+    }
+
+    // 1. 查询用户的订单ID列表
+    LambdaQueryWrapper<Order> orderWrapper = new LambdaQueryWrapper<>();
+    orderWrapper.eq(Order::getUserId, userId);
+    List<Order> orders = orderMapper.selectList(orderWrapper);
+    
+    // 2. 先删除评论（因为 comment 有外键引用 order）
+    LambdaQueryWrapper<Comment> commentWrapper = new LambdaQueryWrapper<>();
+    commentWrapper.eq(Comment::getUserId, userId);
+    commentMapper.delete(commentWrapper);
+    
+    // 3. 删除订单详情
+    for (Order order : orders) {
+        LambdaQueryWrapper<OrderDetail> detailWrapper = new LambdaQueryWrapper<>();
+        detailWrapper.eq(OrderDetail::getOrderId, order.getOrderId());
+        orderDetailMapper.delete(detailWrapper);
+    }
+    
+    // 4. 删除订单
+    orderMapper.delete(orderWrapper);
+    
+    // 5. 删除收藏
+    LambdaQueryWrapper<Collect> collectWrapper = new LambdaQueryWrapper<>();
+    collectWrapper.eq(Collect::getUserId, userId);
+    collectMapper.delete(collectWrapper);
+    
+    // 6. 删除 customer 或 administrator
+    customerMapper.deleteById(userId);
+    administratorMapper.deleteById(userId);
+    
+    // 7. 最后删除 user
+    userMapper.deleteById(userId);
+
+    return ResultVo.success("账号注销成功", null);
+}
+
+// ========== 获取密保问题 ==========
+@Override
+public ResultVo<String> getSecurityQuestion(String userId) {
+    // 1. 检查用户是否存在
+    User user = userMapper.selectById(userId);
+    if (user == null) {
+        return ResultVo.error("账号不存在");
+    }
+    
+    // 2. 判断用户类型（只有顾客有密保问题）
+    String userType = getUserType(userId);
+    if (!"customer".equals(userType)) {
+        return ResultVo.error("商家账号不支持密保找回密码");
+    }
+    
+    // 3. 获取密保问题
+    Customer customer = customerMapper.selectById(userId);
+    if (customer == null || customer.getSecurityQuestion() == null) {
+        return ResultVo.error("未设置密保问题");
+    }
+    
+    return ResultVo.success(customer.getSecurityQuestion());
+}
     // ========== 辅助方法 ==========
     private String getUserType(String userId) {
         if (customerMapper.selectById(userId) != null) {

@@ -65,4 +65,10 @@ public class AuthController {
     public ResultVo<List<UserListVo>> getAllUsers(@RequestParam String currentUserId) {
         return authService.getAllUsers(currentUserId);
     }
+
+    // 获取密保问题
+@GetMapping("/security-question/{userId}")
+public ResultVo<String> getSecurityQuestion(@PathVariable String userId) {
+    return authService.getSecurityQuestion(userId);
+}
 }

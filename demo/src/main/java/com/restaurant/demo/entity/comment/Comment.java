@@ -25,4 +25,7 @@ public class Comment {
 
     @TableField("PublishTime")
     private LocalDateTime publishTime;
+
+    @TableField("likes")
+    private Integer likes;  // 添加这个字段
 }

@@ -226,3 +226,7 @@ CREATE TABLE `dish_image` (
   INDEX `idx_dish_id` (`dish_id`) USING BTREE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '菜品图片表';
 
+-- 修改id大小
+ALTER TABLE `comment` MODIFY COLUMN `CommentID` VARCHAR(64);
+
+
