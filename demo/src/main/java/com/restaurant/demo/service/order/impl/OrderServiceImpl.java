@@ -3,6 +3,7 @@ package com.restaurant.demo.service.order.impl;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -181,15 +182,56 @@ private boolean checkOrderIdExists(String orderId) {
     }
     
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public boolean updateOrderStatus(String orderId, String orderStatus) {
-        Order order = this.getById(orderId);
-        if (order == null) {
-            throw new RuntimeException("订单不存在");
-        }
-        order.setOrderStatus(orderStatus);
-        return this.updateById(order);
+@Transactional(rollbackFor = Exception.class)
+public boolean updateOrderStatus(String orderId, String orderStatus) {
+    Order order = this.getById(orderId);
+    if (order == null) {
+        throw new RuntimeException("订单不存在");
     }
+    
+    String oldStatus = order.getOrderStatus();
+    order.setOrderStatus(orderStatus);
+    boolean result = this.updateById(order);
+    
+    // 状态变更后，推送消息给用户
+    if (result) {
+        notifyUserOrderStatusChanged(order, oldStatus, orderStatus);
+    }
+    
+    return result;
+}
+
+/**
+ * 通知用户订单状态变更
+ */
+private void notifyUserOrderStatusChanged(Order order, String oldStatus, String newStatus) {
+    // 构建推送消息
+    Map<String, Object> message = new HashMap<>();
+    message.put("orderId", order.getOrderId());
+    message.put("oldStatus", oldStatus);
+    message.put("newStatus", newStatus);
+    message.put("message", getStatusMessage(newStatus));
+    
+    // 推送到用户专属频道
+    String destination = "/topic/user/" + order.getUserId() + "/order-status";
+    messagingTemplate.convertAndSend(destination, message);
+    
+    System.out.println("订单状态变更已推送: 用户=" + order.getUserId() + 
+                       ", 订单=" + order.getOrderId() + 
+                       ", 状态=" + oldStatus + "->" + newStatus);
+}
+
+/**
+ * 根据状态码获取状态描述
+ */
+private String getStatusMessage(String status) {
+    switch (status) {
+        case "0": return "订单已提交，等待商家确认";
+        case "1": return "商家已接单，正在准备";
+        case "2": return "订单已完成，请用餐";
+        default: return "订单状态已更新";
+    }
+}
     
     @Override
     public TotalAmountVo getTotalAmount(String startTime, String endTime, String orderStatus) {
