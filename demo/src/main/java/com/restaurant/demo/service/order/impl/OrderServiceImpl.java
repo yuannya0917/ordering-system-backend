@@ -18,6 +18,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.restaurant.demo.dto.order.AddToCartDto;
 import com.restaurant.demo.dto.order.SubmitOrderDto;
 import com.restaurant.demo.entity.order.Order;
+import com.restaurant.demo.entity.order.OrderDetail;
+import com.restaurant.demo.mapper.order.OrderDetailMapper;
 import com.restaurant.demo.mapper.order.OrderMapper;
 import com.restaurant.demo.service.order.OrderService;
 import com.restaurant.demo.vo.order.CartItemVo;
@@ -33,7 +35,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     
     private final OrderMapper orderMapper;
     private final SimpMessagingTemplate messagingTemplate;
-    
+    private final OrderDetailMapper orderDetailMapper;
     // 购物车存储结构：userId -> Map<dishId, CartItemVo>
     private Map<String, Map<String, CartItemVo>> carts = new ConcurrentHashMap<>();
     
@@ -84,8 +86,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     }
     
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public OrderVo submitOrder(SubmitOrderDto submitOrderDto) {
+@Transactional(rollbackFor = Exception.class)
+public OrderVo submitOrder(SubmitOrderDto submitOrderDto) {
     String userId = submitOrderDto.getUserId();
     
     // 获取用户购物车
@@ -103,7 +105,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     // 自动生成订单ID
     String orderId = generateOrderId();
     
-    // 创建订单
+    // 1. 保存订单
     Order order = new Order();
     order.setOrderId(orderId);
     order.setUserId(userId);
@@ -111,8 +113,17 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     order.setOrderNote(submitOrderDto.getOrderNote());
     order.setOrderTime(LocalDateTime.now());
     order.setOrderStatus("0");
-    
     this.save(order);
+    
+    // 2. 保存订单详情（购物车中的每个菜品）
+    for (CartItemVo item : userCart.values()) {
+        OrderDetail orderDetail = new OrderDetail();
+        orderDetail.setOrderId(orderId);
+        orderDetail.setDishId(item.getDishId());
+        orderDetail.setDishNum(item.getDishNum());
+        orderDetail.setDishPrice(item.getDishPrice());
+        orderDetailMapper.insert(orderDetail);  // 需要注入 OrderDetailMapper
+    }
     
     // 清空用户购物车
     carts.remove(userId);
@@ -130,7 +141,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     notifyMerchantNewOrder(orderVo);
     
     return orderVo;
-    }
+}
 
 /**
  * 生成订单ID
