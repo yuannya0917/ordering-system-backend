@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
@@ -25,13 +25,15 @@ public class CommentController {
     @Autowired
     private CommentService commentService;
 
-    /**
-     * 添加评论
-     */
     @PostMapping("/add")
     public ResponseEntity<Map<String, Object>> addComment(@RequestBody CommentAddDTO dto) {
         Map<String, Object> response = new HashMap<>();
-        // 参数校验
+        
+        System.out.println("===== 收到添加评论请求 =====");
+        System.out.println("orderId: " + dto.getOrderId());
+        System.out.println("userId: " + dto.getUserId());
+        System.out.println("content: " + dto.getContent());
+        
         if (dto.getOrderId() == null || dto.getOrderId().trim().isEmpty()) {
             response.put("success", false);
             response.put("message", "订单ID不能为空");
@@ -49,31 +51,37 @@ public class CommentController {
         }
 
         String commentId = generateCommentId();
+        System.out.println("准备插入的 CommentID: " + commentId);
+        System.out.println("CommentID 长度: " + commentId.length());
+        
         try {
-            boolean saved = commentService.addComment(dto.getOrderId(), dto.getUserId(), dto.getContent());
+            Comment comment = new Comment();
+            comment.setCommentId(commentId);
+            comment.setOrderId(dto.getOrderId());
+            comment.setUserId(dto.getUserId());
+            comment.setContent(dto.getContent());
+            comment.setPublishTime(LocalDateTime.now());
+            
+            boolean saved = commentService.save(comment);
             if (saved) {
                 response.put("success", true);
                 response.put("commentId", commentId);
+                System.out.println("评论插入成功！");
                 return ResponseEntity.ok(response);
             } else {
                 response.put("success", false);
                 response.put("message", "评论失败，请稍后重试");
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
             }
-        } catch (IllegalArgumentException e) {
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
+            System.err.println("插入评论时出错：");
+            e.printStackTrace();
             response.put("success", false);
             response.put("message", "系统错误：" + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
-    /**
-     * 删除评论（仅评论作者本人可删）
-     */
     @DeleteMapping("/delete")
     public ResponseEntity<Map<String, Object>> deleteComment(@RequestParam String commentId,
                                                               @RequestParam String userId) {
@@ -95,9 +103,6 @@ public class CommentController {
         }
     }
 
-    /**
-     * 查询某个订单的所有评论
-     */
     @GetMapping("/order/{orderId}")
     public ResponseEntity<List<CommentVO>> getCommentsByOrderId(@PathVariable String orderId) {
         if (orderId == null || orderId.trim().isEmpty()) {
@@ -110,9 +115,6 @@ public class CommentController {
         return ResponseEntity.ok(voList);
     }
 
-    /**
-     * 查询某个用户的所有评论
-     */
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<CommentVO>> getCommentsByUserId(@PathVariable String userId) {
         if (userId == null || userId.trim().isEmpty()) {
@@ -125,9 +127,6 @@ public class CommentController {
         return ResponseEntity.ok(voList);
     }
 
-    /**
-     * 管理员查询所有评论（按时间倒序）
-     */
     @GetMapping("/admin/list")
     public ResponseEntity<List<CommentVO>> getAllCommentsForAdmin() {
         List<Comment> comments = commentService.list(
@@ -139,12 +138,10 @@ public class CommentController {
         return ResponseEntity.ok(voList);
     }
 
-    // ---------- 私有辅助方法 ----------
     private String generateCommentId() {
-        long millis = System.currentTimeMillis();
-        String timePart = Long.toString(millis % 10000000); // 后7位
-        int random = ThreadLocalRandom.current().nextInt(10);
-        return "cmt" + timePart + random; // 总长 3+7+1=11，符合 varchar(11)
+        // 使用UUID的前11位，确保长度固定为11
+        String uuid = UUID.randomUUID().toString().replace("-", "");
+        return uuid.substring(0, 11);
     }
 
     private CommentVO convertToVO(Comment comment) {
