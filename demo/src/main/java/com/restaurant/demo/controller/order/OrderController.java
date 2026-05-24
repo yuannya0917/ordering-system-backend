@@ -78,12 +78,12 @@ public class OrderController {
     return ResultVo.success(result);
     }
     @GetMapping("/all")
-public ResultVo<List<OrderVo>> getAllOrders(
+    public ResultVo<List<OrderVo>> getAllOrders(
         @RequestParam(required = false) String userId,
         @RequestParam(required = false) String orderStatus,
         @RequestParam(required = false) String startTime,
         @RequestParam(required = false) String endTime) {
     List<OrderVo> orders = orderService.getAllOrders(userId, orderStatus, startTime, endTime);
     return ResultVo.success(orders);
-}
+    }
 }

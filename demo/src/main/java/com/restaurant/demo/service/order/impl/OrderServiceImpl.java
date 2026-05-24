@@ -85,52 +85,73 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     @Override
     @Transactional(rollbackFor = Exception.class)
     public OrderVo submitOrder(SubmitOrderDto submitOrderDto) {
-        String userId = submitOrderDto.getUserId();
-        String orderId = submitOrderDto.getOrderId();
-        
-        if (orderId == null || orderId.trim().isEmpty()) {
-            throw new RuntimeException("订单ID不能为空");
-        }
-        
-        Map<String, CartItemVo> userCart = carts.get(userId);
-        
-        if (userCart == null || userCart.isEmpty()) {
-            throw new RuntimeException("购物车为空，无法提交订单");
-        }
-        
-        // 计算总价
-        int totalPrice = userCart.values().stream()
-                .mapToInt(CartItemVo::getTotalPrice)
-                .sum();
-        
-        // 创建订单
-        Order order = new Order();
-        order.setOrderId(orderId);
-        order.setUserId(userId);
-        order.setOrderPrice(totalPrice);
-        order.setOrderNote(submitOrderDto.getOrderNote());
-        order.setOrderTime(LocalDateTime.now());
-        order.setOrderStatus("0");  // 0:待确认
-        
-        this.save(order);
-        
-        // 清空用户购物车
-        carts.remove(userId);
-        
-        // 返回订单VO
-        OrderVo orderVo = new OrderVo();
-        orderVo.setOrderId(order.getOrderId());
-        orderVo.setUserId(order.getUserId());
-        orderVo.setOrderPrice(order.getOrderPrice());
-        orderVo.setOrderTime(order.getOrderTime());
-        orderVo.setOrderNote(order.getOrderNote());
-        orderVo.setOrderStatus(order.getOrderStatus());
-        
-        // 推送新订单通知给商家
-        notifyMerchantNewOrder(orderVo);
-        
-        return orderVo;
+    String userId = submitOrderDto.getUserId();
+    
+    // 获取用户购物车
+    Map<String, CartItemVo> userCart = carts.get(userId);
+    
+    if (userCart == null || userCart.isEmpty()) {
+        throw new RuntimeException("购物车为空，无法提交订单");
     }
+    
+    // 计算总价
+    int totalPrice = userCart.values().stream()
+            .mapToInt(CartItemVo::getTotalPrice)
+            .sum();
+    
+    // 自动生成订单ID
+    String orderId = generateOrderId();
+    
+    // 创建订单
+    Order order = new Order();
+    order.setOrderId(orderId);
+    order.setUserId(userId);
+    order.setOrderPrice(totalPrice);
+    order.setOrderNote(submitOrderDto.getOrderNote());
+    order.setOrderTime(LocalDateTime.now());
+    order.setOrderStatus("0");
+    
+    this.save(order);
+    
+    // 清空用户购物车
+    carts.remove(userId);
+    
+    // 返回订单VO
+    OrderVo orderVo = new OrderVo();
+    orderVo.setOrderId(order.getOrderId());
+    orderVo.setUserId(order.getUserId());
+    orderVo.setOrderPrice(order.getOrderPrice());
+    orderVo.setOrderTime(order.getOrderTime());
+    orderVo.setOrderNote(order.getOrderNote());
+    orderVo.setOrderStatus(order.getOrderStatus());
+    
+    // 推送新订单通知
+    notifyMerchantNewOrder(orderVo);
+    
+    return orderVo;
+    }
+
+/**
+ * 生成订单ID
+ * 格式：yyMMdd + 5位随机数（共11位）
+ * 例如：26052412345
+ */
+private synchronized String generateOrderId() {
+    String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMdd"));
+    String orderId;
+    do {
+        int random = (int) (Math.random() * 90000) + 10000; // 10000-99999
+        orderId = date + random;
+    } while (checkOrderIdExists(orderId));
+    return orderId;
+}
+
+/**
+ * 检查订单ID是否已存在
+ */
+private boolean checkOrderIdExists(String orderId) {
+    return this.getById(orderId) != null;
+}
     
     @Override
     public void notifyMerchantNewOrder(OrderVo orderVo) {
