@@ -255,12 +255,17 @@ public ResultVo<UserInfoVo> getUserInfo(String userId, String currentUserId) {
         }
 
         LambdaQueryWrapper<Customer> wrapper = new LambdaQueryWrapper<>();
+        if ((dto.getUserId() != null && !dto.getUserId().isEmpty()) || 
+    (dto.getUsername() != null && !dto.getUsername().isEmpty())) {
+    wrapper.and(w -> {
         if (dto.getUserId() != null && !dto.getUserId().isEmpty()) {
-            wrapper.like(Customer::getUserId, dto.getUserId());
+            w.like(Customer::getUserId, dto.getUserId());
         }
         if (dto.getUsername() != null && !dto.getUsername().isEmpty()) {
-            wrapper.like(Customer::getUsername, dto.getUsername());
+            w.or().like(Customer::getUsername, dto.getUsername());
         }
+    });
+}
 
         Page<Customer> page = new Page<>(dto.getPage(), dto.getPageSize());
         Page<Customer> customerPage = customerMapper.selectPage(page, wrapper);
